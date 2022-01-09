@@ -3,12 +3,15 @@
 class ControllerExtensionPaymentYkocApi extends Controller
 {
     private $error = array();
+    private $version = '1.0.0';
 
     public function index()
     {
         $this->load->language('extension/payment/ykoc_api');
 
-        $this->document->setTitle($this->language->get('heading_title'));
+        $data['version'] = $this->version;
+
+        $this->document->setTitle($this->language->get('heading_title') . ' ' . $this->version);
 
         $this->load->model('setting/setting');
         $this->load->model('catalog/option');
@@ -18,8 +21,18 @@ class ControllerExtensionPaymentYkocApi extends Controller
             $this->model_setting_setting->editSetting('payment_ykoc_api', $this->request->post);
 
             $this->session->data['success'] = $this->language->get('text_success');
+            
 
-            $this->response->redirect($this->url->link('marketplace/extension', 'user_token=' . $this->session->data['user_token'] . '&type=payment', true));
+            $this->response->redirect($this->url->link('extension/payment/ykoc_api', 'user_token=' . $this->session->data['user_token'] . '&type=payment', true));
+        }
+
+        // Success
+        if (isset($this->session->data['success'])) {
+            $data['success'] = $this->session->data['success'];
+
+            unset($this->session->data['success']);
+        } else {
+            $data['success'] = '';
         }
 
         // Errors and Warning
@@ -119,8 +132,21 @@ class ControllerExtensionPaymentYkocApi extends Controller
 		} elseif ($this->config->get('payment_ykoc_api_logo') && is_file(DIR_IMAGE . $this->config->get('payment_ykoc_api_logo'))) {
 			$data['payment_ykoc_api_logo'] = $this->model_tool_image->resize($this->config->get('payment_ykoc_api_logo'), 100, 100);
 		} else {
-			$data['payment_ykoc_api_logo'] = $this->model_tool_image->resize('payment/ykoc_api/payment_logo.png', 100, 100);
+			$data['payment_ykoc_api_logo'] = $this->model_tool_image->resize('placeholder.png', 100, 100);
 		}
+
+        // Географическая зона
+        if (isset($this->request->post['payment_ykoc_api_geo_zone_id'])) {
+			$data['payment_ykoc_api_geo_zone_id'] = $this->request->post['payment_ykoc_api_geo_zone_id'];
+		} else {
+			$data['payment_ykoc_api_geo_zone_id'] = $this->config->get('payment_ykoc_api_geo_zone_id');
+		}
+
+        $data['TEST'] = $this->request->post['payment_ykoc_api_geo_zone_id'];
+
+		$this->load->model('localisation/geo_zone');
+
+		$data['geo_zones'] = $this->model_localisation_geo_zone->getGeoZones();
 		
         // Порядок сортировки
         if (isset($this->request->post['payment_ykoc_api_sort_order'])) {
