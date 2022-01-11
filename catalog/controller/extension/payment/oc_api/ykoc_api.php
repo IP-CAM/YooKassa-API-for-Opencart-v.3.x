@@ -26,7 +26,7 @@ class ControllerExtensionPaymentOcApiYkocApi extends Controller
             $this->log->write('[YooKassa] ' . "\n\t" . 'Message - ' . $error->getMessage() . "\n\t" . 'Code - ' . $error->getCode() . "\n\t" . 'File - ' . $error->getFile() . "\n\t" . 'Line - ' . $error->getLine(), true);
 
             // Response status
-            $data['status']['code'] = 10; // Error
+            $data['status']['code'] = $error->getCode(); // Error
             $data['status']['message'] = $error->getMessage();
             return $data;
         }

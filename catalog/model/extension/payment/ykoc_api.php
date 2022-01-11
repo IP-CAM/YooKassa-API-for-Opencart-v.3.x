@@ -8,7 +8,7 @@ class ModelExtensionPaymentYkocApi extends Model
 
 	public function getMethod($address, $total)
 	{
-		$this->load->language('extension/payment/ykoc_api');
+		$this->load->language('extension/payment/' . self::MODULE_NAME);
 
 		$query = $this->db->query("SELECT * FROM " . DB_PREFIX . "zone_to_geo_zone WHERE geo_zone_id = '" . (int)$this->config->get('payment_ykoc_api_geo_zone_id') . "' AND country_id = '" . (int)$address['country_id'] . "' AND (zone_id = '" . (int)$address['zone_id'] . "' OR zone_id = '0')");
 
@@ -41,7 +41,11 @@ class ModelExtensionPaymentYkocApi extends Model
 		try {
 			$action = '';
 
+			$this->load->language('extension/payment/' . self::MODULE_NAME);
+
 			if (isset($this->session->data['order_id'])) {
+
+				$customer = $this->formatCustomer($this->session->data['shipping_address']);
 
 				$total = $this->load->controller('extension/module/oc_api/checkout/total/getTotal');
 
@@ -53,7 +57,7 @@ class ModelExtensionPaymentYkocApi extends Model
 
 						unset($this->session->data['action']);
 
-						$action = $this->createPaymentUrl($total);
+						$action = $this->createPaymentUrl($customer, $total);
 
 						$this->session->data['action'] = $action;
 
@@ -66,7 +70,7 @@ class ModelExtensionPaymentYkocApi extends Model
 
 					unset($this->session->data['action']);
 
-					$action = $this->createPaymentUrl($total);
+					$action = $this->createPaymentUrl($customer, $total);
 
 					$this->session->data['action'] = $action;
 
@@ -87,11 +91,10 @@ class ModelExtensionPaymentYkocApi extends Model
 		}
 	}
 
-	private function createPaymentUrl($total)
+	private function createPaymentUrl($customer, $total)
 	{
 
 		$items = [];
-		$customer = $this->session->data['shipping_address'];
 
 		$productItems 	= $this->getProductCart();
 		foreach ($productItems as $product) {
@@ -115,8 +118,9 @@ class ModelExtensionPaymentYkocApi extends Model
 			'description' => 'Заказ №' . $this->session->data['order_id'],
 			"receipt" 		=> array(
 				"customer" 	=> array(
-					"full_name" => $customer['firstname'] . ' ' . $customer['lastname'],
+					"full_name" => $customer['full_name'],
 					"phone" 	=> $customer['telephone'],
+					// "email" 	=> $customer['email']
 				),
 				"items" 	=> $items,
 			)
@@ -124,11 +128,13 @@ class ModelExtensionPaymentYkocApi extends Model
 
 		$idempotenceKey = uniqid('', true);
 
+		$test = $response;
+
 		$client = new \YooKassa\Client();
 		$client->setAuth($this->config->get('payment_ykoc_api_shop_id'), $this->config->get('payment_ykoc_api_sicret_key'));
 		$response = $client->createPayment($response, $idempotenceKey);
 
-		return $response->getConfirmation()->getConfirmationUrl();
+		return [$response->getConfirmation()->getConfirmationUrl(), $test];
 	}
 
 	private function getProductCart()
@@ -190,10 +196,28 @@ class ModelExtensionPaymentYkocApi extends Model
 					"payment_mode" 		=> "full_prepayment", // Полная предоплата
 					"payment_subject" 	=> "sales_tax" // Торговый сбор
 				);
-
 				array_push($services, $tax);
 			}
 		}
 		return $services;
+	}
+
+	private function formatCustomer($customer){
+		$data = [];
+
+		// Format full name
+		$data['full_name'] = $customer['firstname'] . ' ' . $customer['lastname'];
+
+		// Format telephone
+		preg_match('/([0-9]{2})-?([0-9]{3})-?([0-9]{6,7})/', $customer['telephone'], $telephone, PREG_OFFSET_CAPTURE);
+
+		if($telephone[0]){
+			$data['telephone'] = $telephone[0];
+		} else {
+			throw new Exception($this->language->get('error_format_telephone'), 10);
+		}
+
+		// Format email
+		$data['email'] = $this->customer->getEmail();
 	}
 }
